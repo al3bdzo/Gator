@@ -11,8 +11,8 @@ const (
 )
 
 type Config struct{
-	Db_url string `json:"db_url"`
-	Current_user_name string `json:"current_user_name"`
+	DbURL string `json:"db_url"`
+	CurrentUserName string `json:"current_user_name"`
 }
 
 func ReadJson() (Config, error){
@@ -33,7 +33,7 @@ func ReadJson() (Config, error){
 }
 
 func (c *Config) SetUser(user_name string) error {
-	c.Current_user_name = user_name
+	c.CurrentUserName = user_name
 	return writeJson(c,)
 }
 
@@ -50,7 +50,7 @@ func writeJson(cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	
+
 	jsonBytes, err := json.Marshal(cfg)
 	if err != nil {
 		return err
