@@ -8,8 +8,10 @@ import (
 	"io"
 	"html"
 	"fmt"
+	"log"
 	"database/sql"
 	"github.com/al3bdzo/Gator/internal/database"
+	"github.com/google/uuid"
 )
 
 type RSSFeed struct {
@@ -74,11 +76,10 @@ func scrapeFeeds(s *state) error {
 		return err
 	}
 	
-	now := time.Now()
 	err = s.db.MarkFeedFetched(context.Background(), database.MarkFeedFetchedParams{
-		UpdatedAt: now,
+		UpdatedAt: time.Now(),
 		LastFetchedAt: sql.NullTime{
-			Time: now,
+			Time: time.Now(),
 			Valid: true,
 		},
 		ID: nextFeed.ID,
@@ -97,10 +98,37 @@ func scrapeFeeds(s *state) error {
 		return nil
 	}
 
-	fmt.Printf("* Feed: %s\n\n", nextFeed.Name)
 	for _, item := range rssFeed.Channel.Item {
-		fmt.Printf("* Title:	%s\n", item.Title)
+		var publishedAt sql.NullTime
+
+		parsedTime, err := time.Parse(time.RFC1123Z, item.PubDate)
+		if err == nil {
+			publishedAt = sql.NullTime{
+				Time:  parsedTime,
+				Valid: true,
+			}
+		}
+
+		err = s.db.CreatePost(context.Background(), database.CreatePostParams{
+			ID: uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Title: item.Title,
+			Url: item.Link,
+			Description: sql.NullString{
+				String: item.Description,
+				Valid: true,
+			},
+			PublishedAt: publishedAt,
+			FeedID: nextFeed.ID,
+		})
+		
+		if err != nil {
+			log.Printf("Couldn't Create Post: %v", err)
+			continue
+		}
 	}
-	fmt.Println("===============================================================")
+
+	fmt.Printf("Feed %s Collected, %v posts found\n", nextFeed.Name, len(rssFeed.Channel.Item))
 	return nil
 }
