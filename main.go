@@ -6,6 +6,7 @@ import (
 
 	"log"
 	"os"
+	"context"
 
 	"database/sql"
 	_ "github.com/lib/pq"
@@ -42,10 +43,10 @@ func main() {
 	programCommands.register("reset", handlerReset)
 	programCommands.register("users", handlerUsers)
 	programCommands.register("agg", handlerAgg)
-	programCommands.register("addfeed", handlerAddFeed)
+	programCommands.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	programCommands.register("feeds", handlerGetFeeds)
-	programCommands.register("follow", handlerFollow)
-	programCommands.register("following", handlerFollowing)
+	programCommands.register("follow", middlewareLoggedIn(handlerFollow))
+	programCommands.register("following", middlewareLoggedIn(handlerFollowing))
 
 
 	if len(os.Args) < 2 {
@@ -60,5 +61,15 @@ func main() {
 	err = programCommands.run(programState, cmd)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
+		if err != nil {
+			return err
+		}
+		return handler(s, cmd, user)
 	}
 }
