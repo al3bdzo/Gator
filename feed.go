@@ -7,6 +7,9 @@ import (
 	"time"
 	"io"
 	"html"
+	"fmt"
+	"database/sql"
+	"github.com/al3bdzo/Gator/internal/database"
 )
 
 type RSSFeed struct {
@@ -63,4 +66,41 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error){
 	}
 
 	return &RssFeed, nil
+}
+
+func scrapeFeeds(s *state) error {
+	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return err
+	}
+	
+	now := time.Now()
+	err = s.db.MarkFeedFetched(context.Background(), database.MarkFeedFetchedParams{
+		UpdatedAt: now,
+		LastFetchedAt: sql.NullTime{
+			Time: now,
+			Valid: true,
+		},
+		ID: nextFeed.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	rssFeed, err := fetchFeed(context.Background(), nextFeed.Url)
+	if err != nil {
+		return err
+	}
+
+	if len(rssFeed.Channel.Item) == 0 {
+		fmt.Println("No Items in this RSS Feed")
+		return nil
+	}
+
+	fmt.Printf("* Feed: %s\n\n", nextFeed.Name)
+	for _, item := range rssFeed.Channel.Item {
+		fmt.Printf("* Title:	%s\n", item.Title)
+	}
+	fmt.Println("===============================================================")
+	return nil
 }
